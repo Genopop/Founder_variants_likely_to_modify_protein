@@ -1,3 +1,10 @@
+"""
+Filters_RFD_carriers_CCDS_MAF_families_IBDsharing_AlphaMissense_pLIscore.sh: A script that filters variants 
+according to frequency and likelihood to modify the protein.
+
+Written by Sarah Tremblay.
+"""
+
 #!/bin/bash
 #SBATCH --account=<your_account>
 #SBATCH --ntasks=1
