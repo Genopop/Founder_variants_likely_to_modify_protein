@@ -1,3 +1,11 @@
+"""
+variant_annotation.R: A script that gets for every variant : Reference and alternative alleles, orientation of variant (uncertain or not), Gene, rsID, 
+Gene function, Associated diseases (according to OMIM and Gene2Phenotypes) and ClinVar status.
+
+This script has to be run in interactive.
+
+Written by Sarah Tremblay.
+"""
 
 #!/usr/bin/env Rscript
 # ------------------------------------------------------------------------
