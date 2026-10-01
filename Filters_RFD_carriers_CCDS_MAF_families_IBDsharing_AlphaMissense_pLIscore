@@ -193,6 +193,11 @@ awk '$2 == "likely_pathogenic" {print $1}' /path/to/wgs_cluster1_allchr_rfd10_5c
 > /path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_likelypatho.txt
 
 ###############################################################################
-# pLI score
+# Gene function, associated diseases, ClinVar status
 ###############################################################################
 # Run in interactive Rscript variant_annotation.R /path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_likelypatho.txt
+
+###############################################################################
+# pLI score
+###############################################################################
+# Run script pLI_score.R
