@@ -1,0 +1,198 @@
+#!/bin/bash
+#SBATCH --account=<your_account>
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=6
+#SBATCH --mem-per-cpu=5G
+#SBATCH --time=0-01:00
+
+###############################################################################
+# Clusters
+###############################################################################
+VCF_DIR=/path/to/wgs_vcf
+OUT_DIR=/path/to/output
+
+Cluster1_IDS=/path/to/cluster1.txt
+Cluster2_IDS=/path/to/cluster2.txt
+
+for chr in {1..22}; do
+    echo "=== Chromosome $chr ==="
+
+VCF_IN=/path/to/wgs_vcf.gz 
+
+plink2 --vcf $VCF_IN --keep $Cluster1_IDS --recode vcf bgz --out $OUT_DIR/wgs_cluster1_chr${chr}
+plink2 --vcf $VCF_IN --keep $Cluster2_IDS --recode vcf bgz --out $OUT_DIR/wgs_cluster2_chr${chr}
+done
+
+###############################################################################
+# Relative frequency difference (RFD) 10% between clusters
+###############################################################################
+plink2 --vcf $OUT_DIR/wgs_cluster1_chr${chr}.vcf.gz --freq --out $OUT_DIR/freq_cluster1_chr${chr}
+plink2 --vcf $OUT_DIR/wgs_cluster2_chr${chr}.vcf.gz --freq --out $OUT_DIR/freq_cluster2_chr${chr}
+
+frq_cluster1=$OUT_DIR/freq_cluster1_chr${chr}.afreq
+frq_cluster2=$OUT_DIR/freq_cluster2_chr${chr}.afreq
+
+snps_out=$OUT_DIR/snps_rfd10_chr${chr}.txt
+
+    # Joint Cluster1 vs Cluster2 on 1
+awk 'NR==FNR && FNR>1 {
+         if($5+0 > 0) maf_cluster1[$2]=$5;  
+         next
+     }
+    FNR>1 {
+         maf_cluster2=$5+0;                      
+         if(($2 in maf_cluster1) && maf_cluster1[$2] > 0) {
+             rfd=(maf_cluster1[$2] - maf_cluster2) / maf_cluster1[$2];
+             if(rfd >= 0.1) print $2;
+         }
+     }' $frq_cluster1 $frq_cluster2 > $snps_out
+
+for chr in {1..22}; do
+    echo "=== Chromosome $chr ==="
+plink2 --vcf $OUT_DIR/wgs_cluster1_chr${chr}.vcf.gz --extract $OUT_DIR/snps_rfd10_chr${chr}.txt --recode vcf bgz --out $OUT_DIR/wgs_cluster1_rfd10_chr${chr}
+plink2 --vcf $OUT_DIR/wgs_cluster2_chr${chr}.vcf.gz --extract $OUT_DIR/snps_rfd10_chr${chr}.txt --recode vcf bgz --out $OUT_DIR/wgs_cluster2_rfd10_chr${chr}
+done
+
+# Put all chromosomes together
+bcftools concat -Oz $OUT_DIR/wgs_cluster1_rfd10_chr{1..22}.vcf.gz -o $OUT_DIR/wgs_cluster1_allchr_rfd10.vcf.gz
+bcftools index -t $OUT_DIR/wgs_cluster1_allchr_rfd10.vcf.gz
+
+bcftools concat -Oz $OUT_DIR/wgs_cluster2_rfd10_chr{1..22}.vcf.gz -o $OUT_DIR/wgs_cluster2_allchr_rfd10.vcf.gz
+bcftools index -t $OUT_DIR/wgs_cluster2_allchr_rfd10.vcf.gz
+
+###############################################################################
+# At least 5 carriers
+###############################################################################
+bcftools view \
+  -i 'COUNT(GT="het")>=5' \
+  -Oz \
+  -o $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers.vcf.gz \
+  $OUT_DIR/wgs_cluster1_allchr_rfd10.vcf.gz
+bcftools index -t $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers.vcf.gz
+
+#Transform in bfile
+plink2 --vcf $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers.vcf.gz --make-bed --out $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers
+
+###############################################################################
+# CCDS with 10bp flanking
+###############################################################################
+# Extract CCDS and create a BED compatible with PLINK
+awk -F'\t' '
+NR>1 && $6=="Public" {
+    gsub(/\[|\]/,"",$10);          
+    n=split($10,locs,",");        
+    for(i=1;i<=n;i++){
+        split(locs[i],p,"-");      
+        chrom=$1;
+        gsub("chr","",chrom);      
+    # Check start and end are numerics
+        if(p[1]+0 == p[1] && p[2]+0 == p[2]){
+            start=p[1]-1-10;          
+            end=p[2]+10;              
+            print chrom"\t"start"\t"end"\t.";
+        }
+    }
+}' /path/to/ccds/CCDS.current.txt > ccds_intervals_unsorted.bed
+
+# Sort BED according to chromosome and position
+bedtools sort -i ccds_intervals_unsorted.bed > ccds_intervals_sorted.bed
+
+# Extract with PLINK
+plink2 --bfile $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers --extract range ccds_intervals_sorted.bed --make-bed --out $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking
+
+###############################################################################
+# Minor allele frequency (MAF) of at least 10% in cluster 2
+###############################################################################
+plink2 --vcf $OUT_DIR/wgs_cluster2_allchr_rfd10.vcf.gz --freq --out $OUT_DIR/freq_cluster2_allchr_rfd10
+awk 'NR>1 {maf=($5<=0.5)?$5:1-$5; if (maf<=0.1) print $2}' $OUT_DIR/freq_cluster2_allchr_rfd10.afreq > $OUT_DIR/snps_rfd10_maf10cluster2.txt
+plink2 --bfile $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking --extract $OUT_DIR/snps_rfd10_maf10cluster2.txt --make-bed --out $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10
+
+###############################################################################
+# At least 5 different families
+###############################################################################
+# Run identify_carriers.jl with run_identify_carriers.jl to get carriers for every variant
+# Filter to keep variants present in at least 5 different families (FID) according to ID structure
+
+###############################################################################
+# IBD sharing of at least 50%
+###############################################################################
+# Make tped and tfam for every chromosomes (for script ibd_matrix_haplotype.sh)
+for chr in {1..22}; do
+plink2 --bfile $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam --chr $chr --make-bed --out $OUT_DIR/wgs_cluster1_rfd10_5carriers_CCDS_flanking_maf10_5fam_chr${chr}
+done
+
+for chr in {1..22}; do
+plink --bfile $OUT_DIR/wgs_cluster1_rfd10_5carriers_CCDS_flanking_maf10_5fam_chr${chr} --recode transpose --out $OUT_DIR/wgs_cluster1_rfd10_5carriers_CCDS_flanking_maf10_5fam_chr${chr}
+done
+
+# Run ibd_select_one_haplotype_per_carrier.jl with ibd_matrix_haplotype.sh
+
+# IBD sharing calculation using previous script's output
+OUT="/path/to/output.tsv"
+echo -e "variant\tproportion" > "$OUT"
+
+find /path/to/script/output/haplotype_per_carrier_chr* -type f -name "*.tsv" | while read FILE
+do
+    VARIANT=$(basename "$FILE" .tsv)
+
+    awk -v var="$VARIANT" '
+    BEGIN{
+        sum2=0
+        sum3=0
+        n=0
+    }
+    {
+        sum2 += $2
+        sum3 += $3
+        n++
+    }
+    END{
+        observed = (sum2 + sum3)/2
+        possible = n*(n-1)/2
+
+        if(possible>0)
+            prop = observed/possible
+        else
+            prop = 0
+
+        print var "\t" prop
+    }' "$FILE" >> "$OUT"
+
+done
+echo "Done → $OUT"
+
+# Keep variants with proportion of IBD sharing >= 50%
+awk 'NR==1 || $2 >= 0.5' \
+/path/to/output.tsv \
+> /path/to/output_founder.tsv
+
+###############################################################################
+# AlphaMissense
+###############################################################################
+LIST_FOUNDER_VARIANTS=/path/to/list.txt
+plink2 --bfile $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam --extract $OUT_DIR/snps_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder.txt --make-bed --out $OUT_DIR/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder
+
+ALPHA=/path/to/AlphaMissense_hg38.tsv.gz
+BIM=/path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder.bim
+OUT=/path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_amclass.tsv
+
+awk 'BEGIN{FS=OFS="\t"}
+NR==FNR{
+    key1=$1":"$2":"$3":"$4
+    key2=$1":"$2":"$4":"$3
+    am[key1]=$10
+    am[key2]=$10
+    next
+}
+{
+    print $2,(($2 in am)?am[$2]:"")
+}' <(zcat "$ALPHA" | grep -v "^#") "$BIM" > "$OUT"
+
+# List of variants likely pathogenic according to AlphaMissense
+awk '$2 == "likely_pathogenic" {print $1}' /path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_amclass.tsv \
+> /path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_likelypatho.txt
+
+###############################################################################
+# pLI score
+###############################################################################
+# Run in interactive Rscript variant_annotation.R /path/to/wgs_cluster1_allchr_rfd10_5carriers_CCDS_flanking_maf10_5fam_founder_likelypatho.txt
