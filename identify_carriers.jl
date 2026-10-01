@@ -1,4 +1,9 @@
-                                                                                                                                                                                                                         identify_carriers.jl
+"""
+identify_carriers.jl: A script that prints every carrier for each variant.
+
+Written by Gilles-Philippe Morin.
+"""
+identify_carriers.jl
 #!/usr/bin/env julia
 
 using CSV, DataFrames
