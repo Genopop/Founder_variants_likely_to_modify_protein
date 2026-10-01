@@ -1,3 +1,9 @@
+"""
+pLI_score.R: A script that adds pLI score for each variant.
+
+Written by Sarah Tremblay.
+"""
+
 library(data.table)
 
 annot_file      <- "/path/to/variants_annotes.tsv"
