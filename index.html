@@ -42,6 +42,7 @@ dd{margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
 </form>
 <div id="out" aria-live="polite"></div>
 <p class="hint" id="meta"></p>
+<p class="fn" id="cohort">Metrics are calculated with data from CARTaGENE and familial asthma cohort of SLSJ. References: <a href="https://portail.cartagene.qc.ca/?language=fr" target="_blank" rel="noopener noreferrer">Portail</a> (<a href="https://portail.cartagene.qc.ca/" target="_blank" rel="noopener noreferrer">https://portail.cartagene.qc.ca/</a>) and <a href="https://www.nature.com/articles/gene201412" target="_blank" rel="noopener noreferrer">Laprise C. The Saguenay-Lac-Saint-Jean asthma familial collection: the genetics of asthma in a young founder population. Genes Immun 2014; 15: 247–255.</a></p>
 <p class="hint" id="note">*Only autosomes (chr1–chr22) are included.</p>
 </main>
 <script>
@@ -51,8 +52,8 @@ const CRITERIA=["CCDS","MAF","Families","IBD sharing","AlphaMissense","pLI"];
 const PILLS=["CCDS","MAF \u226410%","\u22655 families","\u226550% IBD sharing","Likely pathogenic AlphaMissense","pLI >0.9"];
 const pct=v=>{v=String(v).trim();return v.slice(-1)==="%"?v:v+"%"};
 function buildText(idx,maf,ibd,pli){
-  const M=maf?"has a minor allele frequency (MAF) of "+maf+" in SLSJ*":"has a minor allele frequency (MAF) \u226410% outside of SLSJ";
-  const I=ibd?"has an IBD sharing of "+pct(ibd)+"*":"has an IBD sharing \u226550%";
+  const M=maf?"has a minor allele frequency (MAF) of "+maf+" in SLSJ":"has a minor allele frequency (MAF) \u226410% outside of SLSJ";
+  const I=ibd?"has an IBD sharing of "+pct(ibd)+" among carriers":"has an IBD sharing \u226550%";
   const P=pli?"has a pLI score of "+pli:"has a pLI score >0.9";
   const C="The variant is located in the Consensus Coding Sequence (CCDS)";
   const AM="The variant is predicted as likely pathogenic according to AlphaMissense";
@@ -91,7 +92,7 @@ function lookup(input,data){
   if(hits.length){
     return {status:"found",label,results:hits.map(e=>{
       const idx=e[3],key=canonKey(v.c,e[0],e[1],e[2]);
-      const r={variant:fmt(v.c,e),idx,criterion:CRITERIA[idx],freq:!!(e[4]||e[5]),text:buildText(idx,e[4]||"",e[5]||"",e[6]||""),pills:PILLS.map((t,i)=>({t,pass:i<=idx})),ann:null};
+      const r={variant:fmt(v.c,e),idx,criterion:CRITERIA[idx],text:buildText(idx,e[4]||"",e[5]||"",e[6]||""),pills:PILLS.map((t,i)=>({t,pass:i<=idx})),ann:null};
       if(idx===5){
         const a=Object.prototype.hasOwnProperty.call(data.a,key)?data.a[key]:null;
         if(!a)r.noAnn=true;
@@ -125,14 +126,6 @@ function render(r){
       if(x.noAnn)mk("div","No annotation found for this variant in the annotation table.","err",c);
       if(x.ann){const dl=mk("dl",null,null,c);x.ann.forEach(([l,v])=>{mk("dt",l,null,dl);mk("dd",v,null,dl)})}
     });
-    if(r.results.some(x=>x.freq)){
-      const f=mk("p",null,"fn",out);
-      const link=(t,h)=>{const a=mk("a",t,null,f);a.href=h;a.target="_blank";a.rel="noopener noreferrer"};
-      f.appendChild(document.createTextNode("*Metrics are calculated with data from CARTaGENE and familial asthma cohort of SLSJ. References: "));
-      link("Portail","https://portail.cartagene.qc.ca/?language=fr");
-      f.appendChild(document.createTextNode(" ("));link("https://portail.cartagene.qc.ca/","https://portail.cartagene.qc.ca/");f.appendChild(document.createTextNode(") and "));
-      link("Laprise C. The Saguenay-Lac-Saint-Jean asthma familial collection: the genetics of asthma in a young founder population. Genes Immun 2014; 15: 247\u2013255.","https://www.nature.com/articles/gene201412");
-    }
   }else{
     const c=mk("div",null,"card",out);
     const pre="Variant "+r.label+" was not found among the selected variants";
