@@ -51,20 +51,22 @@ const DATA={"c":{"chr1":[[930314,"C","T",2,"0.00428397","",""],[935835,"C","G",2
 const CRITERIA=["CCDS","MAF","Families","IBD sharing","AlphaMissense","pLI"];
 const PILLS=["CCDS","MAF \u226410%","\u22655 families","\u226550% IBD sharing","Likely pathogenic AlphaMissense","pLI >0.9"];
 const pct=v=>{v=String(v).trim();return v.slice(-1)==="%"?v:v+"%"};
-function buildText(idx,maf,ibd,pli){
-  const M=maf?"has a minor allele frequency (MAF) of "+maf+" in SLSJ":"has a minor allele frequency (MAF) \u226410% outside of SLSJ";
-  const I=ibd?"has an IBD sharing of "+pct(ibd)+" among carriers":"has an IBD sharing \u226550%";
+  function buildText(idx,maf,ibd,pli){
+  const M=maf?"has a minor allele frequency (MAF) of "+maf+" in SLSJ":"has a minor allele frequency (MAF) ≤10% outside of SLSJ";
+  const I=ibd?"has an IBD sharing of "+pct(ibd)+" among carriers":"has an IBD sharing ≥50%";
   const P=pli?"has a pLI score of "+pli:"has a pLI score >0.9";
   const C="The variant is located in the Consensus Coding Sequence (CCDS)";
   const AM="The variant is predicted as likely pathogenic according to AlphaMissense";
+  const N="It is therefore not considered as a potentially pathogenic founder variant according to our criteria.";
+
   return [
     C+".",
     C+" and "+M+".",
-    C+", "+M+" and is present in \u22655 families.",
-    C+", "+M+", is present in \u22655 families and "+I+".",
-    C+", "+M+", is present in \u22655 families and "+I+". "+AM+".",
-    C+", "+M+", is present in \u22655 families and "+I+". "+AM+" and "+P+"."
-  ][idx];
+    C+", "+M+" and is present in ≥5 families.",
+    C+", "+M+", is present in ≥5 families and "+I+".",
+    C+", "+M+", is present in ≥5 families and "+I+". "+AM+".",
+    C+", "+M+", is present in ≥5 families and "+I+". "+AM+" and "+P+"."
+  ][idx] + (idx < 5 ? " " + N : "");
 }
 const ANN_LABELS=["Gene","Gene function","Associated diseases according to OMIM","Associated diseases according to G2P","ClinVar status"];
 const ANN_KEYS=["gene","function","omim","g2p","clinvar"];
