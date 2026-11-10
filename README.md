@@ -1,5 +1,5 @@
 This repository contains the scripts used for the analyses of the article. The study aimed to identify founder variants in Saguenay-Lac-Saint-Jean population that
-are likely to modify the protein, and could be pathogenic.
+are likely to modify the protein, and could be pathogenic. The preprint is available on medRxiv (doi: https://doi.org/10.64898/2026.11.03.26367175).
 
 
 The main script of the repository is Filters_RFD_carriers_MAF_families_IBDsharing_AlphaMissense_pLIscore.sh which allows to filter variants according 
